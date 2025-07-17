@@ -48,7 +48,7 @@ TEST(string, resize_uninitialized) {
   ASSERT_EQ("10086", origin);
 }
 
-TEST(string, resize_uninitialized_default_to_resize) {
+TEST(string, resize_uninitialized_on_vector) {
   ::std::vector<char> vec = {'1', '0', '0', '8', '6'};
   auto* data = resize_uninitialized(vec, 4);
   ASSERT_EQ(4, vec.size());
@@ -59,7 +59,33 @@ TEST(string, resize_uninitialized_default_to_resize) {
   ASSERT_EQ((::std::vector<char> {'1', '0'}), vec);
   data = resize_uninitialized(vec, 4);
   ASSERT_EQ(4, vec.size());
-  ASSERT_EQ((::std::vector<char> {'1', '0', '\0', '\0'}), vec);
+  ASSERT_EQ((::std::vector<char> {'1', '0', '0', '8'}), vec);
+}
+
+TEST(string, resize_uninitialized_on_bvector) {
+  ::std::vector<bool> vec = {true, false, false, true, true};
+  resize_uninitialized(vec, 4);
+  ASSERT_EQ(4, vec.size());
+  ASSERT_EQ((::std::vector<bool> {true, false, false, true}), vec);
+  resize_uninitialized(vec, 2);
+  ASSERT_EQ(2, vec.size());
+  ASSERT_EQ((::std::vector<bool> {true, false}), vec);
+  resize_uninitialized(vec, 4);
+  ASSERT_EQ(4, vec.size());
+  ASSERT_EQ((::std::vector<bool> {true, false, false, true}), vec);
+}
+
+TEST(string, resize_uninitialized_defualt_use_resize) {
+  ::std::vector<::std::string> vec = {"1", "0", "0", "8", "6"};
+  resize_uninitialized(vec, 4);
+  ASSERT_EQ(4, vec.size());
+  ASSERT_EQ((::std::vector<::std::string> {"1", "0", "0", "8"}), vec);
+  resize_uninitialized(vec, 2);
+  ASSERT_EQ(2, vec.size());
+  ASSERT_EQ((::std::vector<::std::string> {"1", "0"}), vec);
+  resize_uninitialized(vec, 4);
+  ASSERT_EQ(4, vec.size());
+  ASSERT_EQ((::std::vector<::std::string> {"1", "0", "", ""}), vec);
 }
 
 TEST(string, resize_uninitialized_zero_work_on_default) {
@@ -119,5 +145,29 @@ TEST(string, stable_reserve_keep_stable_when_recreate) {
     ::std::string ss;
     stable_reserve(ss, cap);
     ASSERT_EQ(cap, ss.capacity());
+  }
+}
+
+TEST(string, exchange_string_internal_buffer) {
+  for (size_t i = 0; i < 256; ++i) {
+    ::std::string s;
+    s.reserve(i);
+    auto old_buffer = s.c_str();
+    auto old_cap = s.capacity();
+    auto buffer = static_cast<char*>(::operator new(i + 2));
+    auto tuple = ::babylon::exchange_string_buffer(s, buffer, i + 2);
+    auto exchanged_buffer = ::std::get<0>(tuple);
+    auto exchanged_buffer_size = ::std::get<1>(tuple);
+    auto new_buffer = s.c_str();
+    auto new_cap = s.capacity();
+    auto new_size = s.size();
+    ASSERT_EQ(buffer, new_buffer);
+    ASSERT_EQ(i + 1, new_cap);
+    ASSERT_EQ(i + 1, new_size);
+    if (exchanged_buffer) {
+      ASSERT_EQ(old_buffer, exchanged_buffer);
+      ASSERT_EQ(old_cap + 1, exchanged_buffer_size);
+      ::operator delete(exchanged_buffer);
+    }
   }
 }
